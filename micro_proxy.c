@@ -258,77 +258,82 @@ open_client_socket( char* hostname, unsigned short port )
     }
 
 
-static void
-proxy_http( char* method, char* path, char* protocol, FILE* sockrfp, FILE* sockwfp )
-    {
-    char line[10000], protocol2[10000], comment[10000];
-    int first_line, status, ich;
-    long content_length, i;
+static void proxy_http( char* method, char* path, char* protocol, FILE* sockrfp, FILE* sockwfp ) {
+	char line[10000], protocol2[10000], comment[10000];
+	int first_line, status, ich;
+	long content_length, i;
 
-    /* Send request. */
-    (void) alarm( TIMEOUT );
-	(void) fprintf( sockwfp, "%s %s %s\r\n", method, path, protocol );
-    /* Forward the remainder of the request from the client. */
-    content_length = -1;
-    while ( fgets( line, sizeof(line), stdin ) != (char*) 0 )
-	{
-	if ( strcmp( line, "\n" ) == 0 || strcmp( line, "\r\n" ) == 0 )
-	    break;
-	(void) fputs( line, sockwfp );
-	(void) alarm( TIMEOUT );
-	trim( line );
-	if ( strncasecmp( line, "Content-Length:", 15 ) == 0 )
-	    content_length = atol( &(line[15]) );
-	}
-    (void) fputs( line, sockwfp );
-    (void) fflush( sockwfp );
-    /* If there's content, forward that too. */
-    if ( content_length != -1 )
-	for ( i = 0; i < content_length && ( ich = getchar() ) != EOF; ++i )
-	    putc( ich, sockwfp );
-    (void) fflush( sockwfp );
+	/* Send request. */
+	alarm( TIMEOUT );
+	fprintf( sockwfp, "%s %s %s\r\n", method, path, protocol );
 
-    /* Forward the response back to the client. */
-    (void) alarm( TIMEOUT );
-    content_length = -1;
-    first_line = 1;
-    status = -1;
-    while ( fgets( line, sizeof(line), sockrfp ) != (char*) 0 )
-	{
-	if ( strcmp( line, "\n" ) == 0 || strcmp( line, "\r\n" ) == 0 )
-	    break;
-	(void) fputs( line, stdout );
-	(void) alarm( TIMEOUT );
-	trim( line );
-	if ( first_line )
-	    {
-	    (void) sscanf( line, "%[^ ] %d %s", protocol2, &status, comment );
-	    first_line = 0;
-	    }
-	if ( strncasecmp( line, "Content-Length:", 15 ) == 0 )
-	    content_length = atol( &(line[15]) );
+	/* Forward the remainder of the request from the client. */
+	content_length = -1;
+	while ( fgets( line, sizeof(line), stdin ) != (char*) 0 ) {
+		if ( strcmp( line, "\n" ) == 0 || strcmp( line, "\r\n" ) == 0 )
+			break;
+
+		fputs( line, sockwfp );
+		alarm( TIMEOUT );
+		trim( line );
+
+		if ( strncasecmp( line, "Content-Length:", 15 ) == 0 )
+			content_length = atol( &(line[15]) );
 	}
-    /* Add a response header. */
-    (void) fputs( "Connection: close\r\n", stdout );
-    (void) fputs( line, stdout );
-    (void) fflush( stdout );
-    /* Under certain circumstances we don't look for the contents, even
-    ** if there was a Content-Length.
-    */
-    if ( strcasecmp( method, "HEAD" ) != 0 && status != 304 )
-	{
-	/* Forward the content too, either counted or until EOF. */
-	for ( i = 0;
-	      ( content_length == -1 || i < content_length ) && ( ich = getc( sockrfp ) ) != EOF;
-	      ++i )
-	    {
-	    putchar( ich );
-	    if ( i % 10000 == 0 )
-		(void) alarm( TIMEOUT );
-	    }
+
+	fputs( line, sockwfp );
+	fflush( sockwfp );
+
+	/* If there's content, forward that too. */
+	if ( content_length != -1 ) {
+		for ( i = 0; i < content_length && ( ich = getchar() ) != EOF; ++i ) {
+			putc( ich, sockwfp );
+		}
 	}
-    (void) fflush( stdout );
-    }
+	fflush( sockwfp );
+
+	/* Forward the response back to the client. */
+	alarm( TIMEOUT );
+	content_length = -1;
+	first_line = 1;
+	status = -1;
+	while ( fgets( line, sizeof(line), sockrfp ) != (char*) 0 ) {
+		if ( strcmp( line, "\n" ) == 0 || strcmp( line, "\r\n" ) == 0 )
+			break;
+
+		fputs( line, stdout );
+		alarm( TIMEOUT );
+		trim( line );
+
+		if ( first_line ) {
+			sscanf( line, "%[^ ] %d %s", protocol2, &status, comment );
+			first_line = 0;
+		}
+
+		if ( strncasecmp( line, "Content-Length:", 15 ) == 0 )
+			content_length = atol( &(line[15]) );
+	}
+
+	/* Add a response header. */
+	fputs( "Connection: close\r\n", stdout );
+	fputs( line, stdout );
+	fflush( stdout );
+
+	/* Under certain circumstances we don't look for the contents, even
+	** if there was a Content-Length.
+	*/
+	if ( strcasecmp( method, "HEAD" ) != 0 && status != 304 ) {
+		/* Forward the content too, either counted or until EOF. */
+		for ( i = 0; ( content_length == -1 || i < content_length ) && 
+				( ich = getc( sockrfp ) ) != EOF; ++i ) {
+			putchar( ich );
+
+			if ( i % 10000 == 0 )
+				alarm( TIMEOUT );
+		}
+	}
+	fflush( stdout );
+}
 
 
 static void
