@@ -1,6 +1,6 @@
 /* micro_proxy - really small HTTP proxy
 **
-** Copyright © 1999 by Jef Poskanzer <jef@mail.acme.com>.
+** Copyright (C) 1999 by Jef Poskanzer <jef@mail.acme.com>.
 ** All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
@@ -332,57 +332,57 @@ proxy_http( char* method, char* path, char* protocol, FILE* sockrfp, FILE* sockw
 
 
 static void
-proxy_ssl( char* method, char* host, char* protocol, FILE* sockrfp, FILE* sockwfp )
-    {
-    int client_read_fd, server_read_fd, client_write_fd, server_write_fd;
-    struct timeval timeout;
-    fd_set fdset;
-    int maxp1, r;
-    char buf[10000];
+proxy_ssl( char* method, char* host, char* protocol, FILE* sockrfp, FILE* sockwfp ) {
+	int client_read_fd, server_read_fd, client_write_fd, server_write_fd;
+	struct timeval timeout;
+	fd_set fdset;
+	int maxp1, r;
+	char buf[10000];
 
-    /* Return SSL-proxy greeting header. */
-    (void) fputs( "HTTP/1.0 200 Connection established\r\n\r\n", stdout );
-    (void) fflush( stdout );
-    /* Now forward SSL packets in both directions until done. */
-    client_read_fd = fileno( stdin );
-    server_read_fd = fileno( sockrfp );
-    client_write_fd = fileno( stdout );
-    server_write_fd = fileno( sockwfp );
-    timeout.tv_sec = TIMEOUT;
-    timeout.tv_usec = 0;
-    if ( client_read_fd >= server_read_fd )
-	maxp1 = client_read_fd + 1;
-    else
-	maxp1 = server_read_fd + 1;
-    (void) alarm( 0 );
-    for (;;)
-	{
-	FD_ZERO( &fdset );
-	FD_SET( client_read_fd, &fdset );
-	FD_SET( server_read_fd, &fdset );
-	r = select( maxp1, &fdset, (fd_set*) 0, (fd_set*) 0, &timeout );
-	if ( r == 0 )
-	    send_error( 408, "Request Timeout", (char*) 0, "Request timed out." );
-	else if ( FD_ISSET( client_read_fd, &fdset ) )
-	    {
-	    r = read( client_read_fd, buf, sizeof( buf ) );
-	    if ( r <= 0 )
-		break;
-	    r = write( server_write_fd, buf, r );
-	    if ( r <= 0 )
-		break;
-	    }
-	else if ( FD_ISSET( server_read_fd, &fdset ) )
-	    {
-	    r = read( server_read_fd, buf, sizeof( buf ) );
-	    if ( r <= 0 )
-		break;
-	    r = write( client_write_fd, buf, r );
-	    if ( r <= 0 )
-		break;
-	    }
+	/* Return SSL-proxy greeting header. */
+	fputs( "HTTP/1.0 200 Connection established\r\n\r\n", stdout );
+	fflush( stdout );
+
+	/* Now forward SSL packets in both directions until done. */
+	client_read_fd = fileno( stdin );
+	server_read_fd = fileno( sockrfp );
+	client_write_fd = fileno( stdout );
+	server_write_fd = fileno( sockwfp );
+	timeout.tv_sec = TIMEOUT;
+	timeout.tv_usec = 0;
+	if ( client_read_fd >= server_read_fd )
+		maxp1 = client_read_fd + 1;
+	else
+		maxp1 = server_read_fd + 1;
+	alarm( 0 );
+
+	for (;;) {
+		FD_ZERO( &fdset );
+		FD_SET( client_read_fd, &fdset );
+		FD_SET( server_read_fd, &fdset );
+		r = select( maxp1, &fdset, (fd_set*) 0, (fd_set*) 0, &timeout );
+		if ( r == 0 )
+			send_error( 408, "Request Timeout", (char*) 0, "Request timed out." );
+		else if ( FD_ISSET( client_read_fd, &fdset ) ) {
+			r = read( client_read_fd, buf, sizeof( buf ) );
+			if ( r <= 0 )
+				break;
+
+			r = write( server_write_fd, buf, r );
+			if ( r <= 0 )
+				break;
+		}
+		else if ( FD_ISSET( server_read_fd, &fdset ) ) {
+			r = read( server_read_fd, buf, sizeof( buf ) );
+			if ( r <= 0 )
+				break;
+
+			r = write( client_write_fd, buf, r );
+			if ( r <= 0 )
+				break;
+		}
 	}
-    }
+}
 
 
 static void
